@@ -13,13 +13,19 @@ public class FirstRobot extends AdvancedRobot
 	
 	/* Keeps track of enemy. If null no enemy scanned*/
 	String enemy = null; 
-	/* Keeps track how many ticks we have been looking for a anemy*/
+	/* Keeps track how many ticks we have been looking for a enemy*/
 	int lookTime = 0;
 	/* Specifies how much to turn the radar*/
 	double radarTurnRate = 10;
 	
 	/*Keeps track of the number of hits*/
 	int hit = 0;
+	
+	/* Keeps track if a ram is in process */
+	boolean activeRam = false;
+	/* Keeps track of how long we are trying to ram*/
+	int ramTime = 0;
+
 	
 	/**
 	 * This method will be called by robocode, everything you want the tank to do
@@ -45,8 +51,39 @@ public class FirstRobot extends AdvancedRobot
     	}
     	
     }
-    
 
+    /*--------------------------Attack Mechanics--------------------------*/ 
+    public void attackMethod(ScannedRobotEvent event)
+    {
+    	if ( getEnergy() > 50 && event.getEnergy() < 15 &&  ramTime < 10)
+    		robotRam(event);
+    	
+    	else
+    	{
+    		ramTime = 0;
+    		robotFire(event);
+    	}
+    }
+    
+    /*--------------------------Ram mechanics--------------------------*/ 
+    public void robotRam(ScannedRobotEvent event)
+    {
+    	activeRam = true;
+    	ramTime++;
+    	
+    	/* Calculate enemy angle (Where the enemy is)*/
+    	double rotation = Utils.normalRelativeAngle(getHeadingRadians() + event.getBearingRadians());
+
+        /* Calculate the coordinates of the robot */
+        double enemyX = Math.abs((getX() + Math.sin(rotation) * event.getDistance()));
+        double enemyY = Math.abs((getY() + Math.cos(rotation) * event.getDistance()));
+        
+        goTo(enemyX, enemyY);    	
+        
+        System.out.printf("---Ram Data---\nPosition: (%f,%f)\nEnemy pos: (%f,%f)\nTime: %d\n", getX(), getY(), enemyX, enemyY, lookTime);
+    }
+   
+    
     /*--------------------------Fire mechanics--------------------------*/ 
     /**
      * This method will aim and fire a bullet if possible
@@ -54,6 +91,8 @@ public class FirstRobot extends AdvancedRobot
      */
     public void robotFire(ScannedRobotEvent event)
     {
+    	lookTime = 0;
+    	
     	double power = adjustFirePower(event);
     	
     	boolean permFire = adjustAim(event);
@@ -62,7 +101,7 @@ public class FirstRobot extends AdvancedRobot
     		setFire(power);   	
     	
     	if ( getGunHeat() == 0)
-    		System.out.printf("---Fire Data---\nActive fire: %s\nPower: %f\nEnergy: %f\nGunHeat: %f\nDistance: %f\nHit: %d\n", permFire == true? "True": "False", power, getEnergy(), getGunHeat(), event.getDistance(), hit);
+    		System.out.printf("---Fire Data---\nActive fire: %s\nPower: %f\nGunHeat: %f\nDistance: %f\nHit: %d\n", permFire == true? "True": "False", power, getGunHeat(), event.getDistance(), hit);
     }
     
     /**
@@ -133,23 +172,24 @@ public class FirstRobot extends AdvancedRobot
     {
     	lookTime++;
     	
+    	System.out.println(lookTime);
+    	
     	if ( enemy == null )
     		fullScan();
     	
-    	/* If we haven't seen our target for x ticks then do something*/
-    	else if ( lookTime > 2 )
-    		setTurnRadarRight(radarTurnRate);
-    	
-    	/* If it reaches here then the radar is at 30+ degrees*/
-    	else if ( lookTime > 5 )
-    		setTurnRadarRight(-radarTurnRate);
-    	
-    	/* If it reaches here the the radar is a -30*/
     	else if ( lookTime > 11 )
     	{
     		fullScan();
     		enemy = null;
+    		activeRam = false;
+    		ramTime = 0;
     	}
+    	
+    	else if ( lookTime > 5 )
+    		setTurnRadarRight(-radarTurnRate);
+    	
+    	else if ( lookTime > 2 )
+    		setTurnRadarRight(radarTurnRate);
     }
     
     /**
@@ -162,18 +202,20 @@ public class FirstRobot extends AdvancedRobot
 
     /**
      * The method will be called once we scanned an enemy tank. We calculate the how much
-     * of the radar we have to turn, register the enemy name and reset the lookTime.
+     * of the radar we have to turn, register the enemy name. This method will also call
+     * the attack method.
      */
     public void onScannedRobot(ScannedRobotEvent event)
     {
     	lookTime = 0;
+    	
     	enemy = event.getName();
     	
     	double rotation = Utils.normalRelativeAngle(getHeadingRadians() - getRadarHeadingRadians() + event.getBearingRadians());
     	
     	setTurnRightRadians(rotation);
     	
-    	robotFire(event);
+    	attackMethod(event);
     }
 
     /*--------------------------Move mechanics--------------------------*/  
@@ -181,7 +223,13 @@ public class FirstRobot extends AdvancedRobot
      * This method will make the tank walk randomly around the CENTER position.
      */
     public void randomWalk()
-    {
+    {    	
+    	if ( activeRam && lookTime < 4 )
+    		return;
+    	
+    	else
+    		activeRam = false;
+    	
     	if ( tick % 10 != 0 )
     		return;
     	
@@ -219,7 +267,7 @@ public class FirstRobot extends AdvancedRobot
     	/**
     	 * Comment the following line to run test against other robots
     	 */
-    	System.out.printf("----Movement data----\nRoute set to: (%f, %f)\nDistance: %f\nAngle: %f\nCurrent pos: (%f, %f)\n", ox, oy, dist, Math.toDegrees(rotation), getX(), getY());
+    	//System.out.printf("----Movement data----\nRoute set to: (%f, %f)\nDistance: %f\nAngle: %f\nCurrent pos: (%f, %f)\n", ox, oy, dist, Math.toDegrees(rotation), getX(), getY());
     }
 
 }
