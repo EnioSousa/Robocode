@@ -48,19 +48,44 @@ public class FirstRobot extends AdvancedRobot
     
 
     /*--------------------------Fire mechanics--------------------------*/ 
+    /**
+     * This method will aim and fire a bullet if possible
+     * @param event Information about the scanned event
+     */
     public void robotFire(ScannedRobotEvent event)
     {
     	double power = adjustFirePower(event);
     	
+    	boolean permFire = adjustAim(event);
     	
+    	if ( permFire )
+    		setFire(power);   	
     	
+    	if ( getGunHeat() == 0)
+    		System.out.printf("---Fire Data---\nActive fire: %s\nPower: %f\nEnergy: %f\nGunHeat: %f\nDistance: %f\nHit: %d\n", permFire == true? "True": "False", power, getEnergy(), getGunHeat(), event.getDistance(), hit);
+    }
+    
+    /**
+     * This method will aim gun at the scanned enemy. In case the gun is reasonably
+     * well aimed then we return true, which indicates that we can fire.
+     * @param event Information about the scanned event
+     * @return true if gun if properly aim at enemy, otherwise false
+     */
+    public boolean adjustAim(ScannedRobotEvent event)
+    {
+    	double rotation = Utils.normalRelativeAngle(getHeadingRadians() - getGunHeadingRadians() + event.getBearingRadians());
+    	double rotationDeg = Math.toDegrees(rotation);
+    	
+    	setTurnGunRightRadians(rotation);
+    	
+    	return Math.abs(rotationDeg) < 10 && getGunHeat() == 0; 
     }
     
     /**
      * This method will adjust the fire power to be fired. It takes in consideration 
      * the distance, previous accuracy and energy levels.
      * @param event Information about the scanned event
-     * @return the fire power to use
+     * @return fire power
      */
     public double adjustFirePower(ScannedRobotEvent event)
     {
@@ -69,15 +94,32 @@ public class FirstRobot extends AdvancedRobot
     	double power = 0;
     	
     	/*Criteria: Distance*/    	
-    	power += dist > 400 ? 0.25: dist > 300 ? 0.75: dist > 200 ? 1.25: dist > 100 ? 1.75: 2; 
-
+    	power += dist > 600 ? 0.25: dist > 500 ? 0.75: dist > 400 ? 1.25: dist > 300 ? 1.75: dist > 200 ? 2: dist > 100 ? 2.5 : 3; 
+    	
     	/*Criteria: Previous accuracy*/  
-    	power += hit >= 2 ? 0.5: hit >= 3 ? 1: 1.5;
+    	power = normalizePower(power);
+    	power += hit >= 4 ? 1.5: hit >= 2 ? 1: hit >= 1 ? 0.5: 0;
 
     	/*Criteria: Current energy*/ 
-    	power -= getEnergy() < 50 ? 1: getEnergy() < 25 ? 1.5: 2;
+    	power = normalizePower(power);
+    	power -= getEnergy() < 25 ? 1: getEnergy() < 25 ? 0.75: getEnergy() <50 ? 0.25: 0;
     	
     	return power;    	
+    }
+    
+    public double normalizePower(double power)
+    {
+    	return power >= 3 ? 3: power <= 0.1 ? 0.1: power;
+    }
+    
+    public void onBulletHit(BulletHitEvent event)
+    {
+    	hit++;
+    }
+    
+    public void onBulletMissed(BulletMissedEvent event)
+    {
+    	hit = 0;
     }
     
     /*--------------------------Scan mechanics--------------------------*/   
@@ -130,6 +172,8 @@ public class FirstRobot extends AdvancedRobot
     	double rotation = Utils.normalRelativeAngle(getHeadingRadians() - getRadarHeadingRadians() + event.getBearingRadians());
     	
     	setTurnRightRadians(rotation);
+    	
+    	robotFire(event);
     }
 
     /*--------------------------Move mechanics--------------------------*/  
