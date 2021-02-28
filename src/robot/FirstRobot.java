@@ -10,6 +10,8 @@ public class FirstRobot extends AdvancedRobot
 	
 	/* Tick counter*/
 	int tick = 0;
+	/* Tick counter for wall avoid manoeuvre*/
+	int wallAvoid = 0;
 	
 	/* Keeps track of enemy. If null no enemy scanned*/
 	String enemy = null; 
@@ -55,7 +57,7 @@ public class FirstRobot extends AdvancedRobot
     /*--------------------------Attack Mechanics--------------------------*/ 
     public void attackMethod(ScannedRobotEvent event)
     {
-    	if ( getEnergy() > 50 && event.getEnergy() < 15 &&  ramTime < 10)
+    	if ( getEnergy() > 50 && event.getEnergy() < 15 &&  ramTime < 10 && wallAvoid == 0 )
     		robotRam(event);
     	
     	else
@@ -172,7 +174,7 @@ public class FirstRobot extends AdvancedRobot
     {
     	lookTime++;
     	
-    	System.out.println(lookTime);
+    	//System.out.println(lookTime);
     	
     	if ( enemy == null )
     		fullScan();
@@ -224,15 +226,24 @@ public class FirstRobot extends AdvancedRobot
      */
     public void randomWalk()
     {    	
-    	if ( activeRam && lookTime < 4 )
+    	/* If the robot is on wall avoidance manoeuvre then we let it run its clock*/
+    	if ( wallAvoid != 0 ) {
+    		wallAvoid--;
+    		return;
+    	}
+    	
+    	else if ( activeRam && lookTime < 4 )
     		return;
     	
-    	else
-    		activeRam = false;
+    	/* If progress reaches here, then neither ram or wall avoidance is active*/
+    	activeRam = false;
+    	wallAvoid = 0;
     	
+    	/* We set instructions to move only at certain intervals, or else the robot would
+    	 * never move for its initial position*/
     	if ( tick % 10 != 0 )
     		return;
-    	
+    	    	
     	double w = getBattleFieldWidth() / 2 ;
     	double h = getBattleFieldHeight() / 2;
     	
@@ -242,6 +253,21 @@ public class FirstRobot extends AdvancedRobot
     	double offset = gen.nextInt() % 100;
     	
     	goTo(w + offset, h + offset);    	
+    }
+
+    /**
+     * This method will calculate the rotation needed to align our heading to the wanted position (ox,oy)
+     * @param ox Coordinate x
+     * @param oy Coordinate y
+     * @return Relative rotation in radians from our current heading to position (x,y)
+     */
+    public double calcRotation(double ox, double oy)
+    {
+    	double x = ox - getX();
+    	double y = oy - getY();
+    	
+    	double rotation = Math.atan2(x, y);
+    	return Utils.normalRelativeAngle(rotation - getHeadingRadians());
     }
     
     /**
@@ -257,10 +283,7 @@ public class FirstRobot extends AdvancedRobot
     	double x = ox - getX();
     	double y = oy - getY();
     	
-    	double rotation = Math.atan2(x, y);
-    	rotation = Utils.normalRelativeAngle(rotation - getHeadingRadians());
-    	
-    	setTurnRightRadians(rotation);
+    	setTurnRightRadians(calcRotation(ox, oy));
     	double dist = Math.hypot(x, y);
     	setAhead(dist);
     	
@@ -268,6 +291,42 @@ public class FirstRobot extends AdvancedRobot
     	 * Comment the following line to run test against other robots
     	 */
     	//System.out.printf("----Movement data----\nRoute set to: (%f, %f)\nDistance: %f\nAngle: %f\nCurrent pos: (%f, %f)\n", ox, oy, dist, Math.toDegrees(rotation), getX(), getY());
+    }
+    
+    
+    /**
+     * This method will dictate on how to proceed when our tank hits a wall.
+     * Simple method, all we do is back way a little then rotate in order to align 
+     * Ourself with the centre of the field
+     */
+    public void onHitWall(HitWallEvent event)
+    {
+    	/* Certain edges cases where we hit the wall and our manoeuvre makes more contact
+    	 * with the wall. Its unfortunate but we CANNOT reprogramme or more collision will follow
+    	 */
+    	if ( wallAvoid > 10 )
+    		return;
+    	
+    	else
+    		wallAvoid = 20;
+    	
+    	double rotation = calcRotation(getBattleFieldHeight()/2, getBattleFieldWidth()/2);
+    	
+    	setTurnRightRadians(rotation);
+    	
+    	double dist;
+    	
+    	/* This condition avoids especial wall hit. It happens when our robot hits the wall on 
+    	 * angles with > 90 degrees, if that happens we need to move forward*/
+    	if ( Math.abs(event.getBearing()) < 90 )
+    		dist = -100;
+    	
+    	else
+    		dist = 100;
+    	
+    	setAhead(dist);
+    	
+    	System.out.printf("Tick %d\nWall hit at %f degrees\nRotating %f degrees\nMoving %f pixels\n", tick, event.getBearing(), Math.toDegrees(rotation), dist);
     }
 
 }
