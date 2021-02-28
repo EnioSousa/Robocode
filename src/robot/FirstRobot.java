@@ -12,6 +12,8 @@ public class FirstRobot extends AdvancedRobot
 	int tick = 0;
 	/* Tick counter for wall avoid manoeuvre*/
 	int wallAvoid = 0;
+	/* Tick counter for robot avoid manoeuvre*/
+	int robotAvoid = 0;
 	
 	/* Keeps track of enemy. If null no enemy scanned*/
 	String enemy = null; 
@@ -226,18 +228,23 @@ public class FirstRobot extends AdvancedRobot
      */
     public void randomWalk()
     {    	
+    	wallAvoid--;
+    	robotAvoid--;
+    	
     	/* If the robot is on wall avoidance manoeuvre then we let it run its clock*/
-    	if ( wallAvoid != 0 ) {
-    		wallAvoid--;
+    	if ( wallAvoid > 0 ) 
     		return;
-    	}
     	
     	else if ( activeRam && lookTime < 4 )
     		return;
     	
-    	/* If progress reaches here, then neither ram or wall avoidance is active*/
+    	else if ( robotAvoid > 0 ) 
+    		return;
+    	
+    	/* If progress reaches here, then neither ram attack, wall or robot avoidance is active*/
     	activeRam = false;
     	wallAvoid = 0;
+    	robotAvoid = 0;
     	
     	/* We set instructions to move only at certain intervals, or else the robot would
     	 * never move for its initial position*/
@@ -326,7 +333,35 @@ public class FirstRobot extends AdvancedRobot
     	
     	setAhead(dist);
     	
-    	System.out.printf("Tick %d\nWall hit at %f degrees\nRotating %f degrees\nMoving %f pixels\n", tick, event.getBearing(), Math.toDegrees(rotation), dist);
+    	System.out.printf("----Wall avoid----\nTick %d\nWall hit at %f degrees\nRotating %f degrees\nMoving %f pixels\n", tick, event.getBearing(), Math.toDegrees(rotation), dist);
+    }
+    
+    /**
+     * This method will dictate on how to proceed when he hit a robot.
+     * Its a simple method where we simply go back a few pixels.
+     */
+    public void onHitRobot(HitRobotEvent event)
+    {
+    	double rotation = Utils.normalRelativeAngle(getHeadingRadians() - getRadarHeadingRadians() + event.getBearingRadians());
+    	
+    	turnRadarRightRadians(rotation);
+    	
+    	if ( activeRam )
+    		return;
+    	
+    	else if ( robotAvoid > 5 )
+    		return;
+    	
+    	else 
+    		robotAvoid = 10;
+    	
+    	if ( Math.abs(event.getBearing()) < 90 )
+    		setAhead(-100);   
+    	
+    	else
+    		setAhead(100);
+    	
+    	System.out.printf("----Robot avoid----\nTick %d\nRobot hit at %f degrees\n", tick, event.getBearing());
     }
 
 }
